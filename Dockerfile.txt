@@ -1,0 +1,24 @@
+# Use an official PHP image as a base
+FROM php:8.0-apache
+
+# Install MySQL extensions and other dependencies
+RUN docker-php-ext-install mysqli pdo pdo_mysql
+
+# Enable mod_rewrite for Apache (needed by WordPress)
+RUN a2enmod rewrite
+
+# Download and extract WordPress
+RUN curl -o /tmp/wordpress.tar.gz https://wordpress.org/latest.tar.gz && \
+    tar -xzf /tmp/wordpress.tar.gz -C /var/www/html --strip-components=1 && \
+    rm /tmp/wordpress.tar.gz
+
+# Set the correct ownership and permissions
+RUN chown -R www-data:www-data /var/www/html && \
+    chmod -R 755 /var/www/html
+
+# Expose port 80 for the web server
+EXPOSE 80
+
+# Start Apache in the foreground
+CMD ["apache2-foreground"]
+
