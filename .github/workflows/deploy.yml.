@@ -1,0 +1,46 @@
+name: Deploy to EC2 from ECR
+
+on:
+  push:
+    branches:
+      - main  # Adjust this to your preferred branch
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v2
+
+      - name: Set up AWS CLI
+        uses: aws-actions/configure-aws-credentials@v1
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-region: us-east-1  # Change to your region
+
+      - name: Deploy to EC2
+        env:
+          PRIVATE_KEY: ${{ secrets.EC2_SSH_PRIVATE_KEY }}
+          EC2_USER: ec2-user  # Change if using a different user
+          EC2_HOST: your_ec2_instance_public_dns_or_ip
+        run: |
+          echo "$PRIVATE_KEY" > private_key.pem
+          chmod 600 private_key.pem
+          ssh -o StrictHostKeyChecking=no -i private_key.pem $EC2_USER@$EC2_HOST << 'EOF'
+            # Log in to Amazon ECR
+            aws ecr get-login-password --region us-east-1 | sudo docker login --username AWS --password-stdin 842676000273.dkr.ecr.us-east-1.amazonaws.com
+
+            # Pull the latest image from ECR
+            sudo docker pull 842676000273.dkr.ecr.us-east-1.amazonaws.com/wordpress:latest
+
+            # Stop and remove the existing container if it's running
+            if [ "$(sudo docker ps -q -f name=wordpress)" ]; then
+              sudo docker stop wordpress
+              sudo docker rm wordpress
+            fi
+
+            # Run the new container
+            sudo docker run -d --name wordpress -p 80:80 842676000273.dkr.ecr.us-east-1.amazonaws.com/wordpress:latest
+          EOF
